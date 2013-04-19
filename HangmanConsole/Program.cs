@@ -3,79 +3,85 @@ using System.Collections.Generic;
 
 namespace HangmanConsole
 {
-    class Program
+    public class Program
     {
-        static void Main(string[] args)
+        /// <summary>
+        /// The character used to represent a letter not yet guessed
+        /// </summary>
+        private const char placeHolderChar = '_';
+
+        /// <summary>
+        /// The current word to guess
+        /// </summary>
+        private static string word = "HORSE";
+
+        /// <summary>
+        /// The letters already guessed
+        /// </summary>
+        private static List<char> guessedLetters = new List<char>();
+
+        /// <summary>
+        /// The current state of the guessed word
+        /// </summary>
+        private static List<char> guessedWord = new List<char>(new string(placeHolderChar, word.Length));
+
+        /// <summary>
+        /// the number of lives remaining
+        /// </summary>
+        private static int lives = 5;
+
+        /// <summary>
+        ///  Message types
+        /// </summary>
+        private enum MessageType
         {
-            // The character used to represent a letter not yet guessed
-            const char placeHolderChar = '_';
+            /// <summary>
+            /// Value represents an info message
+            /// </summary>
+            Info,
 
-            // Used to determine if user input is a letter
-            string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            /// <summary>
+            /// Value represents a warning message
+            /// </summary>
+            Warning,
 
-            // The current word to guess
-            string word = "HORSE";
+            /// <summary>
+            /// Value represents an error message
+            /// </summary>
+            Error,
 
-            // The letters already guessed
-            List<char> guessedLetters = new List<char>();
+            /// <summary>
+            /// Value represents a successful message
+            /// </summary>
+            Success
+        }
 
-            // The current state of the guessed word
-            List<char> guessedWord = new List<char>(new string(placeHolderChar, word.Length));
-
-            // the number of lives remaining
-            int lives = 5;
-
-            // The color assigned to warning text
-            ConsoleColor warningColor = ConsoleColor.Yellow;
-
-            // The color assigned to error text
-            ConsoleColor errorColor = ConsoleColor.Red;
-
-            // The color assigned to exciting text
-            ConsoleColor successColor = ConsoleColor.Green;
-
-            Console.WriteLine("Welcome to Hangman!");
+        public static void Main(string[] args)
+        {
+            DisplayMessage(MessageType.Info, "Welcome to Hangman!");
 
             // while the user still has lives
-            while(lives > 0)
+            while(UserHasLives())
             {
-                
-                Console.WriteLine();
-                Console.WriteLine("Lives: {0}", lives);
-                Console.Write("Word: ");
-
-                // output each letter in the guessed word
-                foreach (char letter in guessedWord)
-                {
-                    Console.Write("{0} ", letter); 
-                }
+                DisplayStatus();
 
                 // prompt user to guess a letter
-                Console.WriteLine();
-                Console.Write("Guess a letter: ");
+                char input = PromptUserForLetter();
 
-                // get pressed key from user
-                char input = Console.ReadKey().KeyChar;
-                input = char.ToUpper(input);
-
-                // after user presses a key, clear the screen to "refresh" new output
+                // after user responds, clear the screen to "refresh" for new output
                 Console.Clear();
 
                 // if the key pressed is NOT a letter
-                if (!alphabet.Contains(input.ToString()))
+                if (!IsLetter(input))
                 {
-                    Console.ForegroundColor = errorColor;
-                    Console.WriteLine("Invalid input! Expected a letter");
-                    Console.ResetColor();
+                    DisplayMessage(MessageType.Error, "Invalid input! Expected a letter\n");
                     continue;
                 }
 
                 // if user has already guessed the letter
-                if (guessedLetters.Contains(input))
+                if (LetterAlreadyGuessed(input))
                 {
-                    Console.ForegroundColor = errorColor;
-                    Console.WriteLine("Oops! You've already chosen \"{0}\"", input);
-                    Console.ResetColor();
+                    DisplayMessage(MessageType.Error, "Oops! You've already chosen \"{0}\"\n", input);
                     continue;
                 }
 
@@ -83,57 +89,184 @@ namespace HangmanConsole
                 guessedLetters.Add(input);
 
                 // if the word contains the guessed letter
-                if (word.Contains(input.ToString()))
+                if (WordHasLetter(input))
                 {
-                    Console.ForegroundColor = successColor;
-                    Console.WriteLine("Great Guess!");
-                    Console.ResetColor();
+                    DisplayMessage(MessageType.Success, "Great Guess!\n");
 
                     // reveal all the letters of the word (guessed word) that match the guessed letter
-                    for (int i = 0; i < word.Length; i++)
-                    {
-                        if (word[i] == input)
-                        {
-                            guessedWord[i] = input;
-                        }
-                    }
+                    RevealLetterInWord(input);
 
-                    // if thw word has been guessed
-                    if (!guessedWord.Contains(placeHolderChar))
+                    // if the word has been guessed
+                    if (WordGuessed())
                     {
-                        Console.ForegroundColor = successColor;
-                        Console.WriteLine("Congratulations! You've guessed the word!");
-                        Console.ResetColor();
+                        DisplayMessage(MessageType.Success, "Congratulations! You've guessed the word!\n");
                         break;
                     }
                 }
                 // if the word does NOT contain the guessed letter
                 else
                 {
-                    Console.ForegroundColor = warningColor;
-                    Console.WriteLine("Sorry, \"{0}\" was not in the word", input);
-                    Console.ResetColor();
+                    DisplayMessage(MessageType.Warning, "Sorry, \"{0}\" was not in the word\n", input);
 
                     // decrement the user's lives
                     lives = lives - 1;
 
                     // if the user has no more lives
-                    if (lives <= 0)
+                    if (!UserHasLives())
                     {
-                        Console.ForegroundColor = errorColor;
-                        Console.WriteLine("You've run out of lives! You LOSE!");
-                        Console.ResetColor();
+                        DisplayMessage(MessageType.Error, "You've run out of lives! You LOSE!\n");
                     }                
                 }
             }
 
-            Console.Write("The word was: ");
-            Console.ForegroundColor = lives <= 0 ? errorColor : successColor;
-            Console.WriteLine(word);
-            Console.ResetColor();
-            Console.WriteLine();
-            Console.WriteLine("Thanks for playing :-)");
+            DisplayMessage(MessageType.Info, "The word was: ");
+            DisplayMessage(WordGuessed() ? MessageType.Success : MessageType.Error, word);
+            DisplayMessage(MessageType.Info, "\nThanks for playing :-)");
+
             Console.ReadKey();
         }
+
+        /// <summary>
+        /// Returns true if the user still has lives remaining, otherwise false
+        /// </summary>
+        private static bool UserHasLives()
+        {
+            return lives > 0;
+        }
+
+        /// <summary>
+        /// Displays current status of game (i.e. # of lives, and guessed word)
+        /// </summary>
+        private static void DisplayStatus()
+        {
+            DisplayMessage(MessageType.Info,  "\nLives: {0}\n", lives);
+            DisplayMessage(MessageType.Info, "Word: ");
+
+            // output each letter in the guessed word
+            foreach (char letter in guessedWord)
+            {
+                DisplayMessage(MessageType.Info, "{0} ", letter);
+            }
+        }
+
+        /// <summary>
+        /// Prompts the user for a letter and waits for user to press a key
+        /// </summary>
+        /// <returns>Returns the character associated with the key pressed by the user</returns>
+        private static char PromptUserForLetter()
+        {
+            DisplayMessage(MessageType.Info,  "\nGuess a letter: ");
+
+            // get pressed key from user
+            char input = Console.ReadKey().KeyChar;
+            input = char.ToUpper(input);
+
+            return input;
+        }
+
+        /// <summary>
+        /// Determines if the given input is a letter
+        /// </summary>
+        /// <param name="input">The input to check</param>
+        /// <returns>Returns true if the given input is a letter, otherwise false</returns>
+        private static bool IsLetter(char input)
+        {
+            const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            return alphabet.Contains(input.ToString());
+        }
+
+        /// <summary>
+        /// Determines if the given letter has already been guessed
+        /// </summary>
+        /// <param name="letter">The letter to check</param>
+        /// <returns>Returns true if the given letter has already been guessed</returns>
+        private static bool LetterAlreadyGuessed(char letter)
+        {
+            return guessedLetters.Contains(letter);
+        }
+
+        /// <summary>
+        /// Determines if the word contains the given letter
+        /// </summary>
+        /// <param name="letter">The letter to check</param>
+        /// <returns>Returns true if the word contains the givent letter</returns>
+        private static bool WordHasLetter(char letter)
+        {
+            return word.Contains(letter.ToString());
+        }
+
+        /// <summary>
+        /// Reveals the given letter for the guessed word
+        /// </summary>
+        /// <param name="letter">The letter to reveal in the guessed word</param>
+        private static void RevealLetterInWord(char letter)
+        {
+            for (int i = 0; i < word.Length; i++)
+            {
+                if (word[i] == letter)
+                {
+                    guessedWord[i] = letter;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determines if the word has been guessed
+        /// </summary>
+        /// <returns>Returns true if the word has been guessed</returns>
+        private static bool WordGuessed()
+        {
+            return UserHasLives() && !guessedWord.Contains(placeHolderChar);
+        }
+
+        /// <summary>
+        /// Displays a message
+        /// </summary>
+        /// <param name="messageType">The type of message (determines the output color)</param>
+        /// <param name="message">The message format</param>
+        /// <param name="args">The optional arguments for the message</param>
+        private static void DisplayMessage(MessageType messageType, string message, params object[] args)
+        {
+            ConsoleColor previousForeColor = Console.ForegroundColor;
+            ConsoleColor previousBackColor = Console.BackgroundColor;
+            Console.ForegroundColor = GetConsoleForeColorFromMessageType(messageType);
+            Console.BackgroundColor = GetConsoleBackColorFromMessageType(messageType);
+            Console.Write(message, args);
+            Console.ForegroundColor = previousForeColor;
+            Console.BackgroundColor = previousBackColor;
+        }
+
+        /// <summary>
+        /// Gets the console fore color for the given message type
+        /// </summary>
+        /// <param name="messageType">The message type to get the console fore color for</param>
+        /// <returns>Returns the console color for the given message type</returns>
+        private static ConsoleColor GetConsoleForeColorFromMessageType(MessageType messageType)
+        {
+            switch (messageType)
+            {
+                case MessageType.Info:
+                    return ConsoleColor.Gray;
+                case MessageType.Warning:
+                    return ConsoleColor.Yellow;
+                case MessageType.Error:
+                    return ConsoleColor.Red;
+                case MessageType.Success:
+                    return ConsoleColor.Green;
+                default:
+                    return ConsoleColor.Gray;
+            }
+        }
+
+        /// <summary>
+        /// Gets the console fore color for the given message type
+        /// </summary>
+        /// <param name="messageType">The message type to get the console fore color for</param>
+        /// <returns>Returns the console color for the given message type</returns>
+        private static ConsoleColor GetConsoleBackColorFromMessageType(MessageType messageType)
+        {
+            return ConsoleColor.Black;
+        }
+
     }
 }
